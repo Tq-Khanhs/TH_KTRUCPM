@@ -1,0 +1,17 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: Customer_Service
+  profiles:
+    active: dev
+
+management:
+  endpoints:
+    web:
+      exposure:
+        exclude: '*'
+logging:
+  level:
+    root: info
+    web: info
