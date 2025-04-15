@@ -1,62 +1,67 @@
 package iuh.fit.se.product_service.service;
 
-import com.example.productservice.dto.StockUpdateRequest;
-import com.example.productservice.model.Product;
-import com.example.productservice.repository.ProductRepository;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+
+import iuh.fit.se.product_service.model.Product;
+import iuh.fit.se.product_service.repository.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class ProductService {
 
     private final ProductRepository productRepository;
+
+    @Autowired
+    public ProductService(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
 
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
 
-    public Product getProductById(Long id) {
-        return productRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found with id: " + id));
+    public Optional<Product> getProductById(Long id) {
+        return productRepository.findById(id);
     }
 
     public Product createProduct(Product product) {
         return productRepository.save(product);
     }
 
-    public Product updateProduct(Long id, Product productDetails) {
-        Product product = getProductById(id);
-        
-        product.setName(productDetails.getName());
-        product.setDescription(productDetails.getDescription());
-        product.setPrice(productDetails.getPrice());
-        product.setStockQuantity(productDetails.getStockQuantity());
-        
-        return productRepository.save(product);
+    public Optional<Product> updateProduct(Long id, Product productDetails) {
+        return productRepository.findById(id)
+                .map(existingProduct -> {
+                    existingProduct.setName(productDetails.getName());
+                    existingProduct.setDescription(productDetails.getDescription());
+                    existingProduct.setPrice(productDetails.getPrice());
+                    existingProduct.setStockQuantity(productDetails.getStockQuantity());
+                    return productRepository.save(existingProduct);
+                });
     }
 
-    public void deleteProduct(Long id) {
-        Product product = getProductById(id);
-        productRepository.delete(product);
+    public boolean deleteProduct(Long id) {
+        return productRepository.findById(id)
+                .map(product -> {
+                    productRepository.delete(product);
+                    return true;
+                })
+                .orElse(false);
     }
 
-    @Transactional
-    public Product updateStock(Long id, StockUpdateRequest request) {
-        Product product = getProductById(id);
-        
-        int currentStock = product.getStockQuantity();
-        int newStock = currentStock - request.getQuantity();
-        
-        if (newStock < 0) {
-            throw new IllegalStateException("Insufficient stock for product: " + id);
-        }
-        
-        product.setStockQuantity(newStock);
-        return productRepository.save(product);
+    public boolean updateStock(Long productId, int quantity) {
+        return productRepository.findById(productId)
+                .map(product -> {
+                    int newQuantity = product.getStockQuantity() - quantity;
+                    if (newQuantity >= 0) {
+                        product.setStockQuantity(newQuantity);
+                        productRepository.save(product);
+                        return true;
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 }
