@@ -13,7 +13,7 @@
     </parent>
 
     <groupId>iuh.fit.se</groupId>
-    <artifactId>Customer_service</artifactId>
+    <artifactId>customer_service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>Customer_service</name>
     <description>Customer_service</description>
