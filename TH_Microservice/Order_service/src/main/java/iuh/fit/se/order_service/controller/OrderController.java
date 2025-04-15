@@ -1,12 +1,9 @@
 package iuh.fit.se.order_service.controller;
 
-import com.example.orderservice.dto.OrderRequest;
-import com.example.orderservice.dto.StatusUpdateRequest;
-import com.example.orderservice.model.Order;
-import com.example.orderservice.service.OrderService;
-import feign.FeignException;
-import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
+
+import iuh.fit.se.order_service.model.Order;
+import iuh.fit.se.order_service.service.OrderService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,10 +12,14 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/orders")
-@RequiredArgsConstructor
 public class OrderController {
 
     private final OrderService orderService;
+
+    @Autowired
+    public OrderController(OrderService orderService) {
+        this.orderService = orderService;
+    }
 
     @GetMapping
     public ResponseEntity<List<Order>> getAllOrders() {
@@ -27,52 +28,39 @@ public class OrderController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
-        try {
-            return ResponseEntity.ok(orderService.getOrderById(id));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return orderService.getOrderById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<Order>> getOrdersByCustomerId(@PathVariable Long customerId) {
+        List<Order> orders = orderService.getOrdersByCustomerId(customerId);
+        return ResponseEntity.ok(orders);
     }
 
     @PostMapping
-    public ResponseEntity<?> createOrder(@RequestBody OrderRequest orderRequest) {
+    public ResponseEntity<Order> createOrder(@RequestBody Order order) {
         try {
-            Order order = orderService.createOrder(orderRequest);
-            return new ResponseEntity<>(order, HttpStatus.CREATED);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        } catch (FeignException e) {
-            return ResponseEntity.status(e.status()).body("Error communicating with other services: " + e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred");
+            Order createdOrder = orderService.createOrder(order);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestBody StatusUpdateRequest request) {
-        try {
-            Order order = orderService.updateOrderStatus(id, request);
-            return ResponseEntity.ok(order);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
+        return orderService.updateOrderStatus(id, status)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> cancelOrder(@PathVariable Long id) {
-        try {
-            orderService.cancelOrder(id);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        } catch (FeignException e) {
-            return ResponseEntity.status(e.status()).body("Error communicating with other services: " + e.getMessage());
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<Void> cancelOrder(@PathVariable Long id) {
+        if (orderService.cancelOrder(id)) {
+            return ResponseEntity.ok().build();
         }
+        return ResponseEntity.badRequest().build();
     }
 }
